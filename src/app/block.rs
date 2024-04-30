@@ -1,8 +1,9 @@
 use super::voxel::{Face, Voxel};
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Block {
+    #[default]
     Air,
     Water,
     Grass,

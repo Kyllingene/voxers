@@ -1,5 +1,4 @@
 use log::{debug, trace};
-use vek::Vec3;
 use winit::{
     event::{DeviceEvent, ElementState, KeyEvent, WindowEvent},
     keyboard::{Key, NamedKey},
@@ -10,15 +9,18 @@ use std::collections::HashMap;
 use std::thread;
 use std::time::Duration;
 
-use crate::renderer::{cached::CachedMesh, camera::Camera, light::LightUniform, Renderer};
+use crate::renderer::{cached::CachedMesh, light::LightUniform, Renderer};
 
-pub mod block;
-pub mod chunk;
+mod block;
+mod chunk;
 mod mesh;
-pub mod voxel;
+mod player;
+mod voxel;
+mod worldgen;
 
 use chunk::{Chunk, ChunkState, CHUNK_SIZE};
 use mesh::BgMesher;
+use player::Player;
 
 pub struct ApplicationState {
     pub renderer: Renderer,
@@ -28,10 +30,8 @@ pub struct ApplicationState {
     chunks: HashMap<[i32; 3], Chunk>,
     chunk_cache: HashMap<[i32; 3], CachedMesh>,
     bg_mesher: BgMesher,
-    next: [i32; 3],
 
-    // sun: LightUniform,
-    controller: CameraController,
+    player: Player,
 }
 
 impl ApplicationState {
@@ -68,25 +68,9 @@ impl ApplicationState {
         let mut renderer = Renderer::new(window).await;
         renderer.light(sun);
 
-        let mut chunks = HashMap::new();
+        let chunks = worldgen::gen(0, [0, 0, 0], [5, 2, 5]);
 
-        let mut rng = rand::thread_rng();
-        use rand::Rng;
-
-        let r = 6i32;
-        for y in -3..0 {
-            for z in -r..r {
-                for x in -r..r {
-                    if rng.gen() {
-                        chunks.insert([x, y, z], chunk::base_chunk());
-                    } else {
-                        chunks.insert([x, y, z], chunk::random_chunk());
-                    }
-                }
-            }
-        }
-        debug!("Generated {} chunks", (r * 2).pow(2) * 3);
-
+        let size = renderer.size;
         Self {
             renderer,
             exit: false,
@@ -95,9 +79,8 @@ impl ApplicationState {
             chunks,
             chunk_cache: HashMap::new(),
             bg_mesher: BgMesher::new(),
-            next: [r, 0, 0],
 
-            controller: CameraController::new(30.0, 200.0),
+            player: Player::new([0.0, 2.0, 0.0], size),
         }
     }
 
@@ -163,14 +146,13 @@ impl ApplicationState {
             );
 
             self.changed = false;
-        } else {
-            for (pos, chunk) in &self.chunks {
-                if chunk.state == ChunkState::Greedy {
-                    if self.bg_mesher.mesh(*pos, &self.chunks) {
-                        trace!("Greedy meshing chunk {pos:?}");
-                    }
-                    break;
-                }
+        } else if let Some((pos, _)) = self
+            .chunks
+            .iter()
+            .find(|(_, c)| c.state == ChunkState::Greedy)
+        {
+            if self.bg_mesher.mesh(*pos, &self.chunks) {
+                trace!("Greedy meshing chunk {pos:?}");
             }
         }
 
@@ -178,7 +160,8 @@ impl ApplicationState {
     }
 
     pub fn update(&mut self, dt: Duration) {
-        self.renderer.update_camera(&mut self.controller, dt);
+        self.player.update(self.renderer.size, dt);
+        self.renderer.update_camera(&self.player.camera);
     }
 
     #[allow(unused)]
@@ -187,16 +170,11 @@ impl ApplicationState {
             return;
         }
 
-        if !self.controller.process_events(event) && event.state == ElementState::Pressed {
+        if !self.player.process_events(event) && event.state == ElementState::Pressed {
             match &event.logical_key {
                 Key::Named(NamedKey::Escape) => self.exit = true,
                 Key::Character(ch) => match ch.as_str() {
                     "t" | "T" => self.renderer.next_pipeline(),
-                    "n" | "N" => {
-                        self.chunks.insert(self.next, chunk::base_chunk());
-                        self.next[0] += 1;
-                        self.changed = true;
-                    }
                     _ => {}
                 },
                 _ => {}
@@ -215,161 +193,11 @@ impl ApplicationState {
 
     #[allow(unused, clippy::single_match)]
     pub fn mouse_movement(&mut self, event: &DeviceEvent, dt: Duration) {
-        if !self.controller.process_mouse(event) {
+        if !self.player.process_mouse(event) {
             match event {
                 DeviceEvent::MouseMotion { delta: (dx, dy) } => {}
                 _ => {}
             }
         }
-    }
-}
-
-pub struct CameraController {
-    speed: f32,
-    sensitivity: f32,
-
-    rotation_horizontal: f32,
-    rotation_vertical: f32,
-
-    is_forward_pressed: bool,
-    is_backward_pressed: bool,
-    is_left_pressed: bool,
-    is_right_pressed: bool,
-    is_space_pressed: bool,
-    is_shift_pressed: bool,
-}
-
-impl CameraController {
-    fn new(speed: f32, sensitivity: f32) -> Self {
-        Self {
-            speed,
-            sensitivity,
-
-            rotation_horizontal: 0.0,
-            rotation_vertical: 0.0,
-
-            is_forward_pressed: false,
-            is_backward_pressed: false,
-            is_left_pressed: false,
-            is_right_pressed: false,
-            is_space_pressed: false,
-            is_shift_pressed: false,
-        }
-    }
-
-    fn process_mouse(&mut self, event: &DeviceEvent) -> bool {
-        match event {
-            DeviceEvent::MouseMotion { delta: (dx, dy) } => {
-                self.rotation_horizontal += *dx as f32;
-                self.rotation_vertical += *dy as f32;
-
-                true
-            }
-            _ => false,
-        }
-    }
-
-    fn process_events(&mut self, event: &KeyEvent) -> bool {
-        let is_pressed = event.state == ElementState::Pressed;
-        match &event.logical_key {
-            Key::Named(NamedKey::ArrowUp) => {
-                self.is_forward_pressed = is_pressed;
-                true
-            }
-            Key::Named(NamedKey::ArrowLeft) => {
-                self.is_left_pressed = is_pressed;
-                true
-            }
-            Key::Named(NamedKey::ArrowDown) => {
-                self.is_backward_pressed = is_pressed;
-                true
-            }
-            Key::Named(NamedKey::ArrowRight) => {
-                self.is_right_pressed = is_pressed;
-                true
-            }
-            Key::Named(NamedKey::Space) => {
-                self.is_space_pressed = is_pressed;
-                true
-            }
-            Key::Named(NamedKey::Shift) => {
-                self.is_shift_pressed = is_pressed;
-                true
-            }
-            Key::Named(NamedKey::Control) => {
-                if is_pressed {
-                    self.speed *= 2.0;
-                } else {
-                    self.speed /= 2.0;
-                }
-                true
-            }
-            Key::Character(ch) => match ch.as_str() {
-                "w" | "W" => {
-                    self.is_forward_pressed = is_pressed;
-                    true
-                }
-                "a" | "A" => {
-                    self.is_left_pressed = is_pressed;
-                    true
-                }
-                "s" | "S" => {
-                    self.is_backward_pressed = is_pressed;
-                    true
-                }
-                "d" | "D" => {
-                    self.is_right_pressed = is_pressed;
-                    true
-                }
-                _ => false,
-            },
-            _ => false,
-        }
-    }
-
-    pub fn update_camera(&mut self, camera: &mut Camera, dt: Duration) {
-        let speed = self.speed * dt.as_secs_f32();
-        let sens = self.sensitivity * dt.as_secs_f32();
-
-        let forward = camera.target - camera.eye;
-        let forward_norm = forward.normalized();
-
-        let up = Vec3::unit_y();
-        let right = -forward_norm.cross(camera.up);
-
-        if self.is_forward_pressed {
-            camera.eye += forward_norm * speed;
-            camera.target += forward_norm * speed;
-        }
-        if self.is_backward_pressed {
-            camera.eye -= forward_norm * speed;
-            camera.target -= forward_norm * speed;
-        }
-        if self.is_left_pressed {
-            camera.eye += right * speed;
-            camera.target += right * speed;
-        }
-        if self.is_right_pressed {
-            camera.eye -= right * speed;
-            camera.target -= right * speed;
-        }
-        if self.is_space_pressed {
-            let dir = Vec3::unit_y() * speed;
-            camera.eye += dir;
-            camera.target += dir;
-        }
-        if self.is_shift_pressed {
-            let dir = Vec3::unit_y() * speed;
-            camera.eye -= dir;
-            camera.target -= dir;
-        }
-
-        camera.target = camera.eye
-            - ((-forward + right * (self.rotation_horizontal * sens))
-                + (-forward + up * (self.rotation_vertical * sens)))
-                .normalized();
-
-        self.rotation_horizontal = 0.0;
-        self.rotation_vertical = 0.0;
     }
 }

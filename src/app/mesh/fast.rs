@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::app::block::Block;
 use crate::app::chunk::{Chunk, CHUNK_SIZE};
+use crate::app::voxel::VoxelSide;
 use crate::renderer::mesh::{DedupMesh, Mesh};
 use crate::renderer::vertex::Vertex;
 
@@ -93,7 +94,7 @@ pub fn fast(chunk: &Chunk, [ax, ay, az]: [i32; 3], chunks: &HashMap<[i32; 3], Ch
     mesh_face(
         &mut mesh,
         chunk,
-        0,
+        VoxelSide::Top,
         pos,
         chunk_above,
         [0, 2, 1],
@@ -105,7 +106,7 @@ pub fn fast(chunk: &Chunk, [ax, ay, az]: [i32; 3], chunks: &HashMap<[i32; 3], Ch
     mesh_face(
         &mut mesh,
         chunk,
-        2,
+        VoxelSide::Bottom,
         pos,
         chunk_below,
         [0, 2, 1],
@@ -117,7 +118,7 @@ pub fn fast(chunk: &Chunk, [ax, ay, az]: [i32; 3], chunks: &HashMap<[i32; 3], Ch
     mesh_face(
         &mut mesh,
         chunk,
-        1,
+        VoxelSide::Side,
         pos,
         chunk_back,
         [0, 1, 2],
@@ -129,7 +130,7 @@ pub fn fast(chunk: &Chunk, [ax, ay, az]: [i32; 3], chunks: &HashMap<[i32; 3], Ch
     mesh_face(
         &mut mesh,
         chunk,
-        1,
+        VoxelSide::Side,
         pos,
         chunk_front,
         [0, 1, 2],
@@ -141,7 +142,7 @@ pub fn fast(chunk: &Chunk, [ax, ay, az]: [i32; 3], chunks: &HashMap<[i32; 3], Ch
     mesh_face(
         &mut mesh,
         chunk,
-        1,
+        VoxelSide::Side,
         pos,
         chunk_left,
         [1, 2, 0],
@@ -153,7 +154,7 @@ pub fn fast(chunk: &Chunk, [ax, ay, az]: [i32; 3], chunks: &HashMap<[i32; 3], Ch
     mesh_face(
         &mut mesh,
         chunk,
-        1,
+        VoxelSide::Side,
         pos,
         chunk_right,
         [1, 2, 0],
@@ -168,7 +169,7 @@ pub fn fast(chunk: &Chunk, [ax, ay, az]: [i32; 3], chunks: &HashMap<[i32; 3], Ch
 fn mesh_face(
     mesh: &mut DedupMesh,
     chunk: &Chunk,
-    voxel_face_idx: usize,
+    voxel_face: VoxelSide,
     [xc, yc, zc]: [i32; 3],
     neighbor: [[bool; CHUNK_SIZE]; CHUNK_SIZE],
     [ai, bi, ci]: [usize; 3],
@@ -221,7 +222,7 @@ fn mesh_face(
 
                 pos[ci] = c;
                 let [x, y, z] = pos;
-                let color = chunk.blocks[y][z][x].voxel().faces[voxel_face_idx].color;
+                let color = chunk.blocks[y][z][x].voxel().faces[voxel_face as usize].color;
 
                 let v = |p, q| {
                     let mut position = [0.0; 3];

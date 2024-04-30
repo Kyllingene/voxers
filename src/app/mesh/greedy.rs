@@ -1,6 +1,7 @@
 use super::ChunkRegion;
 use crate::app::block::Block;
 use crate::app::chunk::CHUNK_SIZE;
+use crate::app::voxel::VoxelSide;
 use crate::renderer::mesh::Mesh;
 use crate::renderer::vertex::Vertex;
 
@@ -118,7 +119,7 @@ pub fn greedy([ax, ay, az]: [i32; 3], chunks: ChunkRegion) -> Mesh {
                 [ax, az, ay],
                 bitmap,
                 kind,
-                0,
+                VoxelSide::Top,
                 above,
                 y as f32 + 1.0,
                 [0, 2, 1],
@@ -149,7 +150,7 @@ pub fn greedy([ax, ay, az]: [i32; 3], chunks: ChunkRegion) -> Mesh {
                 [ax, az, ay],
                 bitmap,
                 kind,
-                2,
+                VoxelSide::Bottom,
                 below,
                 y as f32,
                 [0, 2, 1],
@@ -183,7 +184,7 @@ pub fn greedy([ax, ay, az]: [i32; 3], chunks: ChunkRegion) -> Mesh {
                 [ax, ay, az],
                 bitmap,
                 kind,
-                1,
+                VoxelSide::Side,
                 back,
                 z as f32 - 1.0,
                 [0, 1, 2],
@@ -215,7 +216,7 @@ pub fn greedy([ax, ay, az]: [i32; 3], chunks: ChunkRegion) -> Mesh {
                 [ax, ay, az],
                 bitmap,
                 kind,
-                1,
+                VoxelSide::Side,
                 front,
                 z as f32,
                 [0, 1, 2],
@@ -247,7 +248,7 @@ pub fn greedy([ax, ay, az]: [i32; 3], chunks: ChunkRegion) -> Mesh {
                 [ay, az, ax],
                 bitmap,
                 kind,
-                1,
+                VoxelSide::Side,
                 left,
                 x as f32,
                 [1, 2, 0],
@@ -279,7 +280,7 @@ pub fn greedy([ax, ay, az]: [i32; 3], chunks: ChunkRegion) -> Mesh {
                 [ay, az, ax],
                 bitmap,
                 kind,
-                1,
+                VoxelSide::Side,
                 right,
                 xx as f32 + 1.0,
                 [1, 2, 0],
@@ -300,7 +301,7 @@ fn mesh_face(
     at: [i32; 3],
     mut bitmap: [u32; CHUNK_SIZE],
     kind: Block,
-    voxel_face_idx: usize,
+    voxel_face: VoxelSide,
     neighbor: [u32; CHUNK_SIZE],
     c: f32,
     [ai, bi, ci]: [usize; 3],
@@ -337,7 +338,7 @@ fn mesh_face(
             .unwrap_or(CHUNK_SIZE);
 
         // create the quad
-        let color = kind.voxel().faces[voxel_face_idx].color;
+        let color = kind.voxel().faces[voxel_face as usize].color;
         let v = |a: u32, b: u32| {
             let mut position = [0.0; 3];
             position[ai] = a as f32 + ao + at[0] as f32 * CHUNK_SIZE as f32;

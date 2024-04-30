@@ -32,7 +32,6 @@ pub struct Renderer {
     sun: wgpu::Buffer,
     sun_bind_group: wgpu::BindGroup,
 
-    pub camera: Camera,
     camera_buffer: wgpu::Buffer,
     camera_uniform: CameraUniform,
     camera_bind_group: wgpu::BindGroup,
@@ -101,20 +100,7 @@ impl Renderer {
         let depth_texture = Texture::create_depth_texture(&device, &config, "Depth texture");
         debug!("Depth texture created");
 
-        let eye = (0.0, 1.0, 0.0).into();
-        let camera = Camera {
-            eye,
-            target: eye + vek::Vec3::new(0.0, 0.0, -1.0),
-            up: vek::Vec3::unit_y(),
-            aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 1000.0,
-        };
-
-        let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera);
-
+        let camera_uniform = CameraUniform::new();
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
             contents: bytemuck::cast_slice(&[camera_uniform]),
@@ -320,7 +306,6 @@ impl Renderer {
             sun,
             sun_bind_group,
 
-            camera,
             camera_buffer,
             camera_uniform,
             camera_bind_group,
@@ -352,7 +337,6 @@ impl Renderer {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
-            self.camera.aspect = new_size.width as f32 / new_size.height as f32;
             self.depth_texture =
                 Texture::create_depth_texture(&self.device, &self.config, "Depth texture");
         }
@@ -412,13 +396,8 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn update_camera(
-        &mut self,
-        controller: &mut crate::app::CameraController,
-        dt: std::time::Duration,
-    ) {
-        controller.update_camera(&mut self.camera, dt);
-        self.camera_uniform.update_view_proj(&self.camera);
+    pub fn update_camera(&mut self, camera: &Camera) {
+        self.camera_uniform.update_view_proj(camera);
         self.queue.write_buffer(
             &self.camera_buffer,
             0,

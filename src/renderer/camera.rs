@@ -12,6 +12,19 @@ pub struct Camera {
 }
 
 impl Camera {
+    pub fn new(pos: [f32; 3], aspect: f32) -> Self {
+        let eye = pos.into();
+        Self {
+            eye,
+            target: eye + vek::Vec3::new(0.0, 0.0, -1.0),
+            up: vek::Vec3::unit_y(),
+            aspect,
+            fovy: 45.0,
+            znear: 0.1,
+            zfar: 1000.0,
+        }
+    }
+
     pub fn build_view_projection_matrix(&self) -> Mat4<f32> {
         let view = Mat4::look_at_rh(self.eye, self.target, self.up);
         let proj = Mat4::perspective_rh_zo(self.fovy, self.aspect, self.znear, self.zfar);

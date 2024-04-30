@@ -162,7 +162,7 @@ pub fn fast(chunk: &Chunk, [ax, ay, az]: [i32; 3], chunks: &HashMap<[i32; 3], Ch
         true,
     );
 
-    mesh.to_mesh()
+    mesh.into_mesh()
 }
 
 fn mesh_face(

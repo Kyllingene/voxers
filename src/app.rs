@@ -137,24 +137,22 @@ impl ApplicationState {
             });
 
             let mut num_updated = 0;
-            for pos in updated {
-                if let Some((pos, mesh)) = pos {
-                    if mesh.vertices.len() < 15000 {
-                        // TODO: keep tabs on this number
-                        self.chunks.get_mut(&pos).unwrap().state = ChunkState::Greedy;
-                    } else {
-                        self.chunks.get_mut(&pos).unwrap().state = ChunkState::Cached;
-                    }
-
-                    if let Some(old) = self.chunk_cache.get_mut(&pos) {
-                        self.renderer.update_cache(old, mesh);
-                    } else {
-                        let cached = self.renderer.cache(mesh);
-                        self.chunk_cache.insert(pos, cached);
-                    }
-
-                    num_updated += 1;
+            for (pos, mesh) in updated.into_iter().flatten() {
+                if mesh.vertices.len() < 15000 {
+                    // TODO: keep tabs on this number
+                    self.chunks.get_mut(&pos).unwrap().state = ChunkState::Greedy;
+                } else {
+                    self.chunks.get_mut(&pos).unwrap().state = ChunkState::Cached;
                 }
+
+                if let Some(old) = self.chunk_cache.get_mut(&pos) {
+                    self.renderer.update_cache(old, mesh);
+                } else {
+                    let cached = self.renderer.cache(mesh);
+                    self.chunk_cache.insert(pos, cached);
+                }
+
+                num_updated += 1;
             }
 
             let end = std::time::Instant::now();
@@ -185,21 +183,23 @@ impl ApplicationState {
 
     #[allow(unused)]
     pub fn key_input(&mut self, event: &KeyEvent, dt: Duration) {
-        if !self.controller.process_events(event) {
-            if event.state == ElementState::Pressed {
-                match &event.logical_key {
-                    Key::Named(NamedKey::Escape) => self.exit = true,
-                    Key::Character(ch) => match ch.as_str() {
-                        "t" | "T" => self.renderer.next_pipeline(),
-                        "n" | "N" => {
-                            self.chunks.insert(self.next, chunk::base_chunk());
-                            self.next[0] += 1;
-                            self.changed = true;
-                        }
-                        _ => {}
-                    },
+        if event.repeat {
+            return;
+        }
+
+        if !self.controller.process_events(event) && event.state == ElementState::Pressed {
+            match &event.logical_key {
+                Key::Named(NamedKey::Escape) => self.exit = true,
+                Key::Character(ch) => match ch.as_str() {
+                    "t" | "T" => self.renderer.next_pipeline(),
+                    "n" | "N" => {
+                        self.chunks.insert(self.next, chunk::base_chunk());
+                        self.next[0] += 1;
+                        self.changed = true;
+                    }
                     _ => {}
-                }
+                },
+                _ => {}
             }
         }
     }
@@ -213,7 +213,7 @@ impl ApplicationState {
         )
     }
 
-    #[allow(unused)]
+    #[allow(unused, clippy::single_match)]
     pub fn mouse_movement(&mut self, event: &DeviceEvent, dt: Duration) {
         if !self.controller.process_mouse(event) {
             match event {
@@ -294,6 +294,14 @@ impl CameraController {
             }
             Key::Named(NamedKey::Shift) => {
                 self.is_shift_pressed = is_pressed;
+                true
+            }
+            Key::Named(NamedKey::Control) => {
+                if is_pressed {
+                    self.speed *= 2.0;
+                } else {
+                    self.speed /= 2.0;
+                }
                 true
             }
             Key::Character(ch) => match ch.as_str() {

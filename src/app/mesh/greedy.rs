@@ -320,10 +320,10 @@ fn mesh_face(
         }
 
         // determine the start and width of the quad
-        let start = row.leading_zeros() as u32;
-        let width = (row << start).leading_ones() as u32;
+        let start = row.leading_zeros();
+        let width = (row << start).leading_ones();
 
-        let mask = (!0 << (CHUNK_SIZE as u32 - width as u32)) >> start;
+        let mask = (!0 << (CHUNK_SIZE as u32 - width)) >> start;
 
         // determine the end (height) of the quad
         let end = bitmap[idx + 1..]

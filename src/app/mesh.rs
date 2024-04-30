@@ -5,7 +5,9 @@ use std::thread;
 use super::chunk::Chunk;
 use crate::renderer::mesh::Mesh;
 
+#[allow(clippy::too_many_arguments)]
 mod fast;
+#[allow(clippy::too_many_arguments)]
 mod greedy;
 
 pub use fast::fast;
@@ -63,7 +65,7 @@ impl BgMesher {
         !self.closed
     }
 
-    pub fn query<'a>(&'a mut self) -> Option<([i32; 3], Mesh)> {
+    pub fn query(&mut self) -> Option<([i32; 3], Mesh)> {
         let data = self.recv.try_recv();
         if matches!(data, Err(TryRecvError::Disconnected)) {
             self.closed = true;

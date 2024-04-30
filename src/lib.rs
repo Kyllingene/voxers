@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 pub mod app;
 pub mod renderer;
 

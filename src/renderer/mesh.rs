@@ -1,3 +1,4 @@
+use ahash::HashMapExt;
 use fxhash::FxHashMap;
 
 use crate::renderer::Vertex;
@@ -44,7 +45,11 @@ pub struct DedupMesh {
 
 impl DedupMesh {
     pub(crate) fn new() -> Self {
-        Self::default()
+        Self {
+            vertices: FxHashMap::with_capacity(10_000),
+            indices: Vec::with_capacity(5000),
+            next: 0,
+        }
     }
 
     pub(crate) fn vertex(&mut self, vertex: Vertex) -> u32 {
@@ -66,7 +71,7 @@ impl DedupMesh {
         }
     }
 
-    pub(crate) fn to_mesh(self) -> Mesh {
+    pub(crate) fn into_mesh(self) -> Mesh {
         let mut vertices = vec![Vertex::default(); self.vertices.len()];
 
         for (vertex, idx) in self.vertices {
